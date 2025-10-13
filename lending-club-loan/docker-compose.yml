@@ -1,0 +1,50 @@
+services:
+  # Define the service name. You can use this name in Docker Compose commands.
+  rapidsai_jupyter:
+    # Set the container name as requested.
+    container_name: lending_club_loan_container
+    
+    # Specify the Docker image to use.
+    image: nvcr.io/nvidia/rapidsai/notebooks:25.08-cuda12.0-py3.12
+    
+    # Run commands inside the container as the 'root' user.
+    user: root
+    
+    # Map host ports to container ports.
+    ports:
+      - "8888:8888" # Jupyter Lab
+      - "8787:8787" # Dask dashboard
+      - "8786:8786" # Dask scheduler
+      
+    # Mount the current directory on the host to the specified path in the container.
+    # ${PWD} is a variable that Docker Compose automatically replaces with the current working directory.
+    volumes:
+      - "${PWD}:/home/rapids/notebooks/extra"
+      
+    # Set the shared memory size.
+    shm_size: '1g'
+    
+    # Set resource limits (ulimits).
+    ulimits:
+      memlock: -1
+      
+    # This section enables GPU access for the container, equivalent to '--gpus all'.
+    # This requires a compatible Docker version and the NVIDIA Container Toolkit.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # The command to execute when the container starts.
+    # This is broken into a list for better readability and to avoid shell quoting issues.
+    command:
+      - jupyter-lab
+      - --notebook-dir=/home/rapids/notebooks
+      - --ip=0.0.0.0
+      - --no-browser
+      - --NotebookApp.token=''
+      - --NotebookApp.allow_origin='*'
+      - --allow-root
