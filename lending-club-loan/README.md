@@ -2,6 +2,8 @@
 
 This project builds a deep neural network using PyTorch to predict loan defaults based on the Lending Club dataset. It includes a complete MLOps pipeline featuring:
 
+![Lending Club Loan Default Prediction Project Banner](../assets/lendingclubloan.jpg)
+
 - **Data Cleaning and Feature Engineering**: Robust preparation of the raw dataset.
 - **Hyperparameter Tuning**: Using Optuna to find the best model architecture and training parameters, with the ability to resume long-running experiments.
 - **MLflow Integration**: Tracking experiments, logging metrics, artifacts (like confusion matrices), and managing model versions.
