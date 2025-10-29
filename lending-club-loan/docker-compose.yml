@@ -1,12 +1,14 @@
+name: 'lending_club_loan_stack'
+
 services:
-  # Define the service name. You can use this name in Docker Compose commands.
   rapidsai_jupyter:
-    # Set the container name as requested.
-    container_name: lending_club_loan_container
-    
+    # Set the container name.
+    container_name: rapidsai_gpu_notebook
+    restart: unless-stopped
+
     # Specify the Docker image to use.
     image: nvcr.io/nvidia/rapidsai/notebooks:25.08-cuda12.0-py3.12
-    
+
     # Run commands inside the container as the 'root' user.
     user: root
     
@@ -15,19 +17,21 @@ services:
       - "8888:8888" # Jupyter Lab
       - "8787:8787" # Dask dashboard
       - "8786:8786" # Dask scheduler
-      
+
     # Mount the current directory on the host to the specified path in the container.
-    # ${PWD} is a variable that Docker Compose automatically replaces with the current working directory.
     volumes:
-      - "${PWD}:/home/rapids/notebooks/extra"
+      - type: bind
+        source: ./
+        target: /home/rapids/notebooks/extra
       
     # Set the shared memory size.
-    shm_size: '1g'
-    
+    shm_size: '2g'
+
     # Set resource limits (ulimits).
     ulimits:
       memlock: -1
-      
+      stack: 67108864
+
     # This section enables GPU access for the container, equivalent to '--gpus all'.
     # This requires a compatible Docker version and the NVIDIA Container Toolkit.
     deploy:
@@ -38,13 +42,113 @@ services:
               count: all
               capabilities: [gpu]
 
-    # The command to execute when the container starts.
-    # This is broken into a list for better readability and to avoid shell quoting issues.
-    command:
-      - jupyter-lab
-      - --notebook-dir=/home/rapids/notebooks
-      - --ip=0.0.0.0
-      - --no-browser
-      - --NotebookApp.token=''
-      - --NotebookApp.allow_origin='*'
-      - --allow-root
+    # Environment variables to connect Jupyter to MLflow and MinIO
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      EXTRA_CONDA_PACKAGES: "pytorch pytorch-cuda=12.1 skorch mlflow==3.5.1 plotly -c pytorch -c nvidia -c conda-forge"
+      EXTRA_APT_PACKAGES: ""
+      EXTRA_PIP_PACKAGES: ""
+    command: >
+      jupyter-lab
+      --notebook-dir=/home/rapids/notebooks
+      --ip=0.0.0.0
+      --no-browser
+      --NotebookApp.token=''
+      --NotebookApp.allow_origin='*'
+      --allow-root
+    networks:
+      - lending_club_loan_network
+
+  db:
+    image: postgres:16-alpine
+    container_name: mlflow_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mlflow_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlflow_password}
+      POSTGRES_DB: mlflow_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lending_club_loan_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mlflow_user} -d mlflow_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: mlflow_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9090"
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    volumes:
+      - minio_data:/data
+    networks:
+      - lending_club_loan_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  init-minio:
+    image: minio/mc
+    container_name: mlflow_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set myminio http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD) do echo '...waiting for minio...' && sleep 1; done;
+      /usr/bin/mc mb myminio/mlflow-artifacts --ignore-existing;
+      exit 0;
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    networks:
+      - lending_club_loan_network
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mlflow_server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      init-minio:
+        condition: service_completed_successfully
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER:-mlflow_user}:${POSTGRES_PASSWORD:-mlflow_password}@db:5432/mlflow_db
+      --default-artifact-root s3://mlflow-artifacts
+      --host 0.0.0.0
+      --port 5000
+    networks:
+      - lending_club_loan_network
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  lending_club_loan_network:
+    driver: bridge
