@@ -65,6 +65,12 @@ docker-compose up -d
 ```
 *(Note: If you are using a newer version of Docker, the command may be `docker compose up -d` without the hyphen).*
 
+> **Note on Startup Time**
+>
+> The `docker-compose up` command will download the required Docker images if they are not present on your system. Additionally, upon starting, the container will install the following Python packages: `pytorch`, `skorch`, `mlflow`, `boto3`, and `plotly`.
+>
+> The initial startup time can take between **5 to 10 minutes**, depending on your host's processing capabilities and internet connection speed.
+
 **What happens now?**
 *   Docker will check if you have the `nvcr.io/nvidia/rapidsai/notebooks:25.08-cuda12.0-py3.12` image locally.
 *   If not, it will download the image. This can take several minutes depending on your internet connection, as the image is quite large.
