@@ -15,6 +15,7 @@ NUM_DATALOADER_WORKERS = 0 #os.cpu_count() - 1 if os.cpu_count() > 1 else 0
 
 # Champion model & training parameters
 REGISTERED_MODEL_NAME = "lending_club_loan_classification_model"
+CANDIDATE_ALIAS = "candidate"
 CHAMPION_ALIAS = "champion"
 CHAMPION_EPOCHS = 200
 CHAMPION_PATIENCE = 15
