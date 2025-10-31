@@ -8,7 +8,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 def find_optimal_threshold(y_true, y_prob):
-    """Finds the optimal probability threshold for a classifier based on F1-score."""
+    """
+    Finds the optimal probability threshold for a classifier based on F1-score for the positive class (1).
+    Args:
+        y_true: True labels.
+        y_prob: Probabilities for the positive class (1).
+    """
     precisions, recalls, thresholds = precision_recall_curve(y_true, y_prob)
     
     # Calculate F1 score for each threshold
@@ -48,17 +53,22 @@ def evaluate_champion_model(model, X_test, y_test, device, optimal_threshold, ar
     y_pred = (y_prob > optimal_threshold).astype(int)
     
     print("\nClassification Report (Test Set):")
-    print(classification_report(y_test, y_pred, target_names=["Bad Loan (0)", "Good Loan (1)"]))
+    print(classification_report(y_test, y_pred, target_names=["Good Loan (0)", "Bad Loan (1)"]))
 
     cm = confusion_matrix(y_test, y_pred)
+    # The heatmap labels will correspond to the matrix:
+    # Top-left (TN): Predicted Good, Actual Good
+    # Bottom-right (TP): Predicted Bad, Actual Bad
     plt.figure(figsize=(6, 5)); sns.heatmap(cm, annot=True, fmt='d', cmap='Blues'); plt.title("Confusion Matrix");
     cm_path = f"{artifact_path}/confusion_matrix.png"; plt.savefig(cm_path); plt.close()
 
+    # The ROC curve works correctly because y_prob is the probability of the positive class (1). No change needed.
     fpr, tpr, _ = roc_curve(y_test, y_prob); roc_auc = auc(fpr, tpr)
     plt.figure(figsize=(6, 5)); plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.3f})'); plt.plot([0, 1], [0, 1], 'k--'); plt.title('ROC Curve'); plt.legend();
     roc_path = f"{artifact_path}/roc_curve.png"; plt.savefig(roc_path); plt.close()
     
-    precision, recall, _ = precision_recall_curve(y_test, 1 - y_prob, pos_label=0); pr_auc = auc(recall, precision)
+    # --- Precision-Recall curve to focus on the "Bad Loan" class (1) ---
+    precision, recall, _ = precision_recall_curve(y_test, y_prob, pos_label=1); pr_auc = auc(recall, precision)
     plt.figure(figsize=(6, 5)); plt.plot(recall, precision, label=f'PR curve (AUC = {pr_auc:.3f})'); plt.title('PR Curve (Bad Loan)'); plt.legend();
     pr_path = f"{artifact_path}/pr_curve.png"; plt.savefig(pr_path); plt.close()
     
