@@ -28,6 +28,7 @@ def load_and_clean_data(filepath="./data/accepted_2007_to_2018Q4.csv"):
     except FileNotFoundError:
         raise FileNotFoundError(f"Error: '{filepath}' not found. Please download the dataset.")
 
+    # Define the statuses for "Fully Paid" (Good Loans)
     fully_paid_statuses = [
         'Fully Paid',
         'Does not meet the credit policy. Status:Fully Paid'
@@ -41,7 +42,7 @@ def load_and_clean_data(filepath="./data/accepted_2007_to_2018Q4.csv"):
     ]
     
     loan_data = loan_data[loan_data['loan_status'].isin(fully_paid_statuses + defaulted_statuses)].copy()
-    loan_data['loan_status_binary'] = loan_data['loan_status'].apply(lambda x: 1 if x in fully_paid_statuses else 0)
+    loan_data['loan_status_binary'] = loan_data['loan_status'].apply(lambda x: 1 if x in defaulted_statuses else 0) # Good Loan = 0, Bad Loan = 1
 
     for col in loan_data.select_dtypes(include=['object']).columns:
         if loan_data[col].dtype == 'object':
