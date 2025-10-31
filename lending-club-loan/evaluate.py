@@ -10,21 +10,13 @@ import seaborn as sns
 def find_optimal_threshold(y_true, y_prob):
     """
     Finds the optimal probability threshold for a classifier based on F1-score for the positive class (1).
-    Args:
-        y_true: True labels.
-        y_prob: Probabilities for the positive class (1).
     """
     precisions, recalls, thresholds = precision_recall_curve(y_true, y_prob)
-    
-    # Calculate F1 score for each threshold
     f1_scores = 2 * (recalls * precisions) / (recalls + precisions)
-    
-    # Convert potential NaNs (from 0/0) to 0 to prevent argmax from failing.
     f1_scores = np.nan_to_num(f1_scores)
     
     if len(f1_scores) > 0:
         best_f1_idx = np.argmax(f1_scores)
-        # thresholds array can be one element shorter than f1_scores
         optimal_threshold_idx = min(best_f1_idx, len(thresholds) - 1)
         optimal_threshold = thresholds[optimal_threshold_idx]
         best_f1 = f1_scores[best_f1_idx]
@@ -37,39 +29,50 @@ def find_optimal_threshold(y_true, y_prob):
 
 def evaluate_champion_model(model, X_test, y_test, device, optimal_threshold, artifact_path="artifacts"):
     print(f"\n--- Evaluating Champion Model on Test Set (using threshold: {optimal_threshold:.4f}) ---")
-    test_dataset = TensorDataset(torch.FloatTensor(X_test), torch.FloatTensor(y_test.values))
-    test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
+    test_dataset = TensorDataset(torch.from_numpy(X_test), torch.from_numpy(y_test.values))
+    test_loader = DataLoader(test_dataset, batch_size=2048, shuffle=False)
     
     model.eval()
-    y_test_probs_list = []
+    all_probs = []
     with torch.no_grad():
         for X_batch, _ in test_loader:
-            X_batch = X_batch.to(device)
-            logits = model(X_batch)
+            logits = model(X_batch.to(device))
             probs = torch.sigmoid(logits)
-            y_test_probs_list.extend(probs.cpu().numpy())
+            all_probs.append(probs.cpu())
     
-    y_prob = np.array(y_test_probs_list).flatten()
+    y_prob = torch.cat(all_probs).numpy().flatten()
     y_pred = (y_prob > optimal_threshold).astype(int)
     
     print("\nClassification Report (Test Set):")
     print(classification_report(y_test, y_pred, target_names=["Good Loan (0)", "Bad Loan (1)"]))
 
     cm = confusion_matrix(y_test, y_pred)
-    # The heatmap labels will correspond to the matrix:
-    # Top-left (TN): Predicted Good, Actual Good
-    # Bottom-right (TP): Predicted Bad, Actual Bad
-    plt.figure(figsize=(6, 5)); sns.heatmap(cm, annot=True, fmt='d', cmap='Blues'); plt.title("Confusion Matrix");
-    cm_path = f"{artifact_path}/confusion_matrix.png"; plt.savefig(cm_path); plt.close()
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title("Confusion Matrix")
+    cm_path = f"{artifact_path}/confusion_matrix.png"
+    plt.savefig(cm_path)
+    plt.close()
 
-    # The ROC curve works correctly because y_prob is the probability of the positive class (1). No change needed.
-    fpr, tpr, _ = roc_curve(y_test, y_prob); roc_auc = auc(fpr, tpr)
-    plt.figure(figsize=(6, 5)); plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.3f})'); plt.plot([0, 1], [0, 1], 'k--'); plt.title('ROC Curve'); plt.legend();
-    roc_path = f"{artifact_path}/roc_curve.png"; plt.savefig(roc_path); plt.close()
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    roc_auc = auc(fpr, tpr)
+    plt.figure(figsize=(6, 5))
+    plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.3f})')
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.title('ROC Curve')
+    plt.legend()
+    roc_path = f"{artifact_path}/roc_curve.png"
+    plt.savefig(roc_path)
+    plt.close()
     
-    # --- Precision-Recall curve to focus on the "Bad Loan" class (1) ---
-    precision, recall, _ = precision_recall_curve(y_test, y_prob, pos_label=1); pr_auc = auc(recall, precision)
-    plt.figure(figsize=(6, 5)); plt.plot(recall, precision, label=f'PR curve (AUC = {pr_auc:.3f})'); plt.title('PR Curve (Bad Loan)'); plt.legend();
-    pr_path = f"{artifact_path}/pr_curve.png"; plt.savefig(pr_path); plt.close()
+    precision, recall, _ = precision_recall_curve(y_test, y_prob, pos_label=1)
+    pr_auc = auc(recall, precision)
+    plt.figure(figsize=(6, 5))
+    plt.plot(recall, precision, label=f'PR curve (AUC = {pr_auc:.3f})')
+    plt.title('PR Curve (Bad Loan)')
+    plt.legend()
+    pr_path = f"{artifact_path}/pr_curve.png"
+    plt.savefig(pr_path)
+    plt.close()
     
     return {"test_roc_auc": roc_auc, "test_pr_auc": pr_auc, "cm_path": cm_path, "roc_path": roc_path, "pr_path": pr_path}

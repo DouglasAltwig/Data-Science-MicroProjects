@@ -37,7 +37,6 @@ def set_model_alias(model_name, alias, run_id):
     print(f"\n--- Setting '{alias}' alias for model from run {run_id} ---")
     client = MlflowClient()
     try:
-        # Find the model version associated with the champion model's run_id
         results = client.search_model_versions(f"name='{model_name}' AND run_id='{run_id}'")
         if not results:
             print(f"Warning: No model version found for '{model_name}' from run '{run_id}'. Alias not set.")
@@ -48,6 +47,23 @@ def set_model_alias(model_name, alias, run_id):
         print(f"Alias '{alias}' set for version {latest_version} of model '{model_name}'.")
     except Exception as e:
         print(f"Error setting alias for model '{model_name}': {e}")
+
+
+def create_model_signature(input_df: pd.DataFrame) -> ModelSignature:
+    """Creates an MLflow ModelSignature for the given input DataFrame."""
+    input_schema_list = []
+    for col, dtype in input_df.dtypes.items():
+        if np.issubdtype(dtype, np.floating):
+            mlflow_type = "double"
+        elif np.issubdtype(dtype, np.integer):
+            mlflow_type = "long"
+        else:
+            mlflow_type = "string"
+        input_schema_list.append(ColSpec(type=mlflow_type, name=col))
+    
+    input_schema = Schema(input_schema_list)
+    output_schema = Schema([TensorSpec(np.dtype(np.int64), (-1,), "prediction")])
+    return ModelSignature(inputs=input_schema, outputs=output_schema)
 
 
 def main():
@@ -67,6 +83,8 @@ def main():
         print("Cached engineered data not found. Processing from raw CSV...")
         df = load_and_clean_data(config.DATA_FILEPATH)
         df_engineered = feature_engineer(df)
+        output_dir = os.path.dirname(config.PREPROCESSED_PARQUET_FILEPATH)
+        os.makedirs(output_dir, exist_ok=True)
         print(f"Saving engineered data to {config.PREPROCESSED_PARQUET_FILEPATH} for caching...")
         df_engineered.to_parquet(config.PREPROCESSED_PARQUET_FILEPATH, index=False)
 
@@ -79,6 +97,12 @@ def main():
     n_features = X_train.shape[1]
     class_counts = y_train.value_counts()
     pos_weight = torch.tensor([class_counts[0] / class_counts[1]], device=config.DEVICE)
+
+    # Convert data to required types for PyTorch
+    X_train_torch = X_train.astype(np.float32)
+    X_val_torch = X_val.astype(np.float32)
+    X_test_torch = X_test.astype(np.float32)
+    y_train_torch = y_train.to_numpy().astype(np.float32)
 
     with mlflow.start_run(run_name="Loan_Default_Prediction_Pipeline") as parent_run:
         print(f"\n--- Started Parent Run: {parent_run.info.run_id} ---")
@@ -108,7 +132,7 @@ def main():
                 net = NeuralNetBinaryClassifier(
                     module=LoanPredictorDNN,
                     module__input_size=n_features,
-                    criterion=nn.BCEWithLogitsLoss,
+                    criterion=config.CRITERION_FN,
                     criterion__pos_weight=pos_weight,
                     optimizer=torch.optim.AdamW,
                     device=config.DEVICE,
@@ -121,15 +145,11 @@ def main():
                     verbose=0
                 ).set_params(**params)
         
-                X_train_np = X_train.astype(np.float32)
-                y_train_np = y_train.to_numpy().astype(np.float32)
-                net.fit(X_train_np, y_train_np)
-
-                X_val_np = X_val.astype(np.float32)
-                y_val_probs = net.predict_proba(X_val_np)[:, 1]
+                net.fit(X_train_torch, y_train_torch)
+                y_val_probs = net.predict_proba(X_val_torch)[:, 1]
                 
                 y_val_pred = (y_val_probs >= 0.5).astype(int)
-                val_f1 = f1_score(y_val, y_val_pred, pos_label=1) # F1 for "Bad Loan" (class 1)
+                val_f1 = f1_score(y_val, y_val_pred, pos_label=1)
                 
                 mlflow.log_metric("validation_f1_score", val_f1)
                 print(f"Validation F1-score (Bad Loan): {val_f1:.4f}")
@@ -159,9 +179,9 @@ def main():
             print(f"Champion model will use {n_features} features. Run ID: {champion_run_id}")
             mlflow.log_param("champion_model_run_id", champion_run_id)
 
-            X_train_full = np.vstack((X_train, X_val))
+            X_train_full = np.vstack((X_train_torch, X_val_torch))
             y_train_full = pd.concat([y_train, y_val])
-            y_train_full_np = y_train_full.to_numpy().astype(np.float32)
+            y_train_full_torch = y_train_full.to_numpy().astype(np.float32)
             
             n_train = len(X_train)
             train_indices = np.arange(n_train)
@@ -171,7 +191,7 @@ def main():
             champion_classifier = NeuralNetBinaryClassifier(
                 module=LoanPredictorDNN,
                 module__input_size=n_features,
-                criterion=nn.BCEWithLogitsLoss,
+                criterion=config.CRITERION_FN,
                 criterion__pos_weight=pos_weight,
                 optimizer=torch.optim.AdamW,
                 device=config.DEVICE,
@@ -182,9 +202,9 @@ def main():
             ).set_params(**best_params)
 
             print("Fitting the champion model on the combined training and validation data...")
-            champion_classifier.fit(X_train_full.astype(np.float32), y_train_full_np)
+            champion_classifier.fit(X_train_full, y_train_full_torch)
 
-            y_val_probs_champion = champion_classifier.predict_proba(X_val.astype(np.float32))[:, 1]
+            y_val_probs_champion = champion_classifier.predict_proba(X_val_torch)[:, 1]
             optimal_threshold_champion = find_optimal_threshold(y_val, y_val_probs_champion)
             print(f"Found optimal threshold for champion model: {optimal_threshold_champion}")
 
@@ -200,19 +220,7 @@ def main():
             ])
             full_pipeline._is_fitted = True
             
-            input_schema_list = []
-            for col, dtype in X_test_raw.dtypes.items():
-                if np.issubdtype(dtype, np.floating):
-                    mlflow_type = "double"  # 'float64' maps to 'double'
-                elif np.issubdtype(dtype, np.integer):
-                    mlflow_type = "long"    # 'int64' maps to 'long'
-                else:
-                    mlflow_type = "string"  # 'object' and others map to 'string'
-                input_schema_list.append(ColSpec(type=mlflow_type, name=col))
-            
-            input_schema = Schema(input_schema_list)
-            output_schema = Schema([TensorSpec(np.dtype(np.int64), (-1,), "prediction")])
-            signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+            signature = create_model_signature(X_test_raw)
             
             mlflow.sklearn.log_model(
                 sk_model=full_pipeline,
@@ -224,7 +232,7 @@ def main():
             
             os.makedirs(config.ARTIFACT_PATH, exist_ok=True)
             eval_metrics = evaluate_champion_model(
-                champion_classifier.module_, X_test, y_test, 
+                champion_classifier.module_, X_test_torch, y_test, 
                 config.DEVICE, optimal_threshold_champion, config.ARTIFACT_PATH
             )
             mlflow.log_metrics({

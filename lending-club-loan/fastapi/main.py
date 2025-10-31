@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-# --- Pydantic Schemas ---
+
 class LoanApplication(BaseModel):
     loan_amnt: float = Field(default=25000.0, description="The listed amount of the loan applied for by the borrower.")
     term: str = Field(default="36 months", description="The number of payments on the loan. Values are in months and can be either 36 or 60.")
@@ -76,21 +76,18 @@ class LoanApplication(BaseModel):
     hardship_flag: str = Field(default="N")
     disbursement_method: str = Field(default="Cash")
     debt_settlement_flag: str = Field(default="N")
-    credit_history_length: float = Field(default=15.0) # From feature engineering
-    issue_year: int = Field(default=2018) # From feature engineering
-    issue_month: int = Field(default=10) # From feature engineering
-    loan_amnt_div_instlmnt: float = Field(default=29.42) # From feature engineering
-    loan_to_income_ratio: float = Field(default=0.45) # From feature engineering
-    dti_x_income: float = Field(default=1317250.0) # From feature engineering
-    revol_util_x_inq: float = Field(default=0.0) # From feature engineering
+    credit_history_length: float = Field(default=15.0)
+    issue_year: int = Field(default=2018)
+    issue_month: int = Field(default=10)
+    loan_amnt_div_instlmnt: float = Field(default=29.42)
+    loan_to_income_ratio: float = Field(default=0.45)
+    dti_x_income: float = Field(default=1317250.0)
+    revol_util_x_inq: float = Field(default=0.0)
 
 class PredictionResponse(BaseModel):
     prediction: int
     label: str
 
-# --- ML Model State Management ---
-# Use a simple dictionary to hold the model and its metadata.
-# This makes it thread-safe in FastAPI's async context.
 model_state = {
     "model": None,
     "current_version": None,
@@ -108,7 +105,6 @@ def load_champion_model():
         )
         latest_version = latest_version_obj.version
 
-        # Only reload if the version has changed
         if latest_version != model_state["current_version"]:
             print(f"New champion model version detected: {latest_version}. (Previously: {model_state['current_version']})")
             model_state["model"] = mlflow.pyfunc.load_model(model_uri)
@@ -118,10 +114,8 @@ def load_champion_model():
             print(f"Model version {latest_version} is already loaded.")
             
     except Exception as e:
-        print(f"Error loading model: {e}")
-        # Keep the old model running if loading fails
+        print(f"Error loading model: {e}. API will continue with old model if available.")
         if model_state["model"] is None:
-             model_state["model"] = None
              model_state["current_version"] = None
 
 
@@ -132,7 +126,7 @@ async def model_polling_task():
             load_champion_model()
         except Exception as e:
             print(f"Error during model polling: {e}")
-        await asyncio.sleep(60) # Poll every 60 seconds
+        await asyncio.sleep(60)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -146,11 +140,9 @@ async def lifespan(app: FastAPI):
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     print(f"Connecting to MLflow at: {MLFLOW_TRACKING_URI}")
     
-    # Load the initial model on startup
     print("Performing initial model load...")
     load_champion_model()
     
-    # Start the background polling task
     print("Starting background model polling task...")
     asyncio.create_task(model_polling_task())
     
@@ -160,7 +152,6 @@ async def lifespan(app: FastAPI):
     model_state.clear()
     print("Application shut down.")
 
-# --- FastAPI App ---
 app = FastAPI(
     title="Loan Default Prediction API",
     description="Serves a PyTorch model via skorch and MLflow for predicting loan defaults. The model is automatically updated from the MLflow registry.",

@@ -28,13 +28,10 @@ def load_and_clean_data(filepath="./data/accepted_2007_to_2018Q4.csv"):
     except FileNotFoundError:
         raise FileNotFoundError(f"Error: '{filepath}' not found. Please download the dataset.")
 
-    # Define the statuses for "Fully Paid" (Good Loans)
     fully_paid_statuses = [
         'Fully Paid',
         'Does not meet the credit policy. Status:Fully Paid'
     ]
-
-    # Define the statuses for "Defaulted" (Bad Loans)
     defaulted_statuses = [
         'Charged Off',
         'Default',
@@ -42,11 +39,11 @@ def load_and_clean_data(filepath="./data/accepted_2007_to_2018Q4.csv"):
     ]
     
     loan_data = loan_data[loan_data['loan_status'].isin(fully_paid_statuses + defaulted_statuses)].copy()
-    loan_data['loan_status_binary'] = loan_data['loan_status'].apply(lambda x: 1 if x in defaulted_statuses else 0) # Good Loan = 0, Bad Loan = 1
+    # Use np.where for faster conditional assignment. Good Loan = 0, Bad Loan = 1
+    loan_data['loan_status_binary'] = np.where(loan_data['loan_status'].isin(defaulted_statuses), 1, 0)
 
     for col in loan_data.select_dtypes(include=['object']).columns:
-        if loan_data[col].dtype == 'object':
-            loan_data[col] = loan_data[col].str.strip()
+        loan_data[col] = loan_data[col].str.strip()
 
     def parse_emp_length(x):
         if pd.isnull(x) or x.strip() in ["", "n/a", "NA"]: return np.nan
@@ -54,7 +51,7 @@ def load_and_clean_data(filepath="./data/accepted_2007_to_2018Q4.csv"):
         if x == "< 1 year": return 0.5
         if "10+" in x: return 10
         try: return float(x.split()[0])
-        except Exception: return np.nan
+        except (ValueError, IndexError): return np.nan
     loan_data['emp_length'] = loan_data['emp_length'].apply(parse_emp_length)
 
     date_columns = ['issue_d', 'earliest_cr_line']
@@ -69,7 +66,6 @@ def load_and_clean_data(filepath="./data/accepted_2007_to_2018Q4.csv"):
                             'payment_plan_start_date', 'hardship_start_date', 'hardship_end_date', 
                             'last_fico_range_high', 'last_fico_range_low', 'out_prncp', 'out_prncp_inv']
     cols_to_drop_irrelevant = ['id', 'url', 'title', 'emp_title', 'zip_code', 'desc', 'member_id']
-    
     cols_to_drop_redundant = ['loan_status', 'grade', 'policy_code']
     
     all_cols_to_drop = list(set(cols_to_drop_leakage + cols_to_drop_irrelevant + cols_to_drop_redundant))

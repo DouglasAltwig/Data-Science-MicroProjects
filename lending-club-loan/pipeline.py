@@ -1,7 +1,5 @@
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.pipeline import Pipeline
-
 
 class ThresholdClassifier(BaseEstimator, TransformerMixin):
     """
@@ -22,15 +20,7 @@ class ThresholdClassifier(BaseEstimator, TransformerMixin):
         return self.predict(X)
 
     def predict(self, X):
+        # skorch expects float32, so ensure correct type
         X_float32 = X.astype(np.float32)
-        # Get probabilities from the wrapped model
         probabilities = self.model.predict_proba(X_float32)[:, 1]
-        # Apply the custom threshold
         return (probabilities > self.threshold).astype(int)
-
-
-def build_feature_pipeline(preprocessor):
-    """Creates the preprocessing pipeline."""
-    return Pipeline([
-        ('preprocessor', preprocessor),
-    ])
