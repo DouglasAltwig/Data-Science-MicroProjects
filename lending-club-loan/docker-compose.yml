@@ -175,7 +175,6 @@ services:
 volumes:
   postgres_data:
   minio_data:
-  fastapi_data:
 
 networks:
   lending_club_loan_network:
