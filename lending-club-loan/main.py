@@ -247,7 +247,7 @@ def main():
     
     sample = X_test_raw.iloc[:1]
     prediction = loaded_pipeline.predict(sample)[0]
-    print(f"Example prediction on a raw sample: {'Bad Loan' if prediction == 0 else 'Good Loan'}")
+    print(f"Example prediction on a raw sample: {'Bad Loan' if prediction == 1 else 'Good Loan'}")
 
 if __name__ == "__main__":
     main()
