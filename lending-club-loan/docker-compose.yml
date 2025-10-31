@@ -121,7 +121,7 @@ services:
 
   mlflow:
     build:
-      context: .
+      context: ./mlflow
       dockerfile: Dockerfile
     container_name: mlflow_server
     restart: unless-stopped
