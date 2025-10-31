@@ -48,7 +48,7 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      EXTRA_CONDA_PACKAGES: "pytorch pytorch-cuda=12.1 skorch mlflow==3.5.1 plotly -c pytorch -c nvidia -c conda-forge"
+      EXTRA_CONDA_PACKAGES: "pytorch pytorch-cuda=12.1 skorch mlflow==3.5.1 boto3 plotly -c pytorch -c nvidia -c conda-forge"
       EXTRA_APT_PACKAGES: ""
       EXTRA_PIP_PACKAGES: ""
     command: >
@@ -140,6 +140,7 @@ services:
       mlflow server
       --backend-store-uri postgresql://${POSTGRES_USER:-mlflow_user}:${POSTGRES_PASSWORD:-mlflow_password}@db:5432/mlflow_db
       --default-artifact-root s3://mlflow-artifacts
+      --allowed-hosts "*"
       --host 0.0.0.0
       --port 5000
     networks:
