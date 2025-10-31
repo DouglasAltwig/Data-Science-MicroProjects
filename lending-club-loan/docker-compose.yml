@@ -146,9 +146,36 @@ services:
     networks:
       - lending_club_loan_network
 
+  fastapi:
+    build:
+      context: ./fastapi
+      dockerfile: Dockerfile
+    container_name: lending_club_loan_api
+    restart: unless-stopped
+    depends_on:
+      - mlflow
+    ports:
+      - "8000:8000"
+    volumes:
+      - type: bind
+        source: ./fastapi
+        target: /app
+    environment:
+      REGISTERED_MODEL_NAME: lending_club_loan_classification_model
+      CHAMPION_ALIAS: champion
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: >
+      uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - lending_club_loan_network
+
 volumes:
   postgres_data:
   minio_data:
+  fastapi_data:
 
 networks:
   lending_club_loan_network:
