@@ -13,7 +13,9 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CRITERION_FN = nn.BCEWithLogitsLoss # Loss function class
 NUM_DATALOADER_WORKERS = 0 #os.cpu_count() - 1 if os.cpu_count() > 1 else 0
 
-# Champion model training parameters (can be larger than HPO)
+# Champion model & training parameters
+REGISTERED_MODEL_NAME = "lending_club_loan_classification_model"
+CHAMPION_ALIAS = "champion"
 CHAMPION_EPOCHS = 200
 CHAMPION_PATIENCE = 15
 CHAMPION_BATCH_SIZE = 256
