@@ -89,7 +89,7 @@ def main():
     # }
 
     param_grid = {
-        'module__layer_sizes': [[182, 182*2, 182*2, 182, 91]],
+        'module__layer_sizes': [[256, 128, 64, 32, 16]],
         'module__dropout_rate': [0.4],
         'lr': [1e-3],
         'optimizer__weight_decay': [1e-5],
