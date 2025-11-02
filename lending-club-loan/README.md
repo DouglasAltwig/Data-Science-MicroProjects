@@ -67,11 +67,9 @@ The FastAPI service implements an automated model polling strategy so the API al
 
 ---
 
-### Getting Started: Lending Club Loan Project
+## Getting Started: Lending Club Loan Project
 
 This guide will walk you through cloning the project repository, starting the required services with Docker Compose, and accessing the Jupyter Lab environment.
-
----
 
 ### Prerequisites
 
@@ -151,8 +149,6 @@ This will log experiments and register a model in MLflow:
 python scripts/run_pipeline.py
 ```
 
----
-
 ### How to promote the candidate to champion
 
 Promote the candidate to champion (after verifying metrics):
@@ -160,13 +156,9 @@ Promote the candidate to champion (after verifying metrics):
 python scripts/promote_model.py
 ```
 
----
-
 ### How to serve the model for inference
 
 Start the FastAPI service (or run via Docker Compose): Docker Compose will wire MLflow, MinIO, Postgres, and the FastAPI service (see docker-compose.yml).
-
----
 
 ### How to Stop the Environment
 
@@ -175,5 +167,4 @@ When you are finished working, you can stop the container by returning to the sa
 ```bash
 docker-compose down
 ```
-
 This command will gracefully stop and remove the container and its associated network. Your work will remain safe in the project directory.
