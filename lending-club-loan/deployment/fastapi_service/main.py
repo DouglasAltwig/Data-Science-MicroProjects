@@ -1,4 +1,10 @@
 import os
+import sys
+
+# Add project root to Python path
+# project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# sys.path.append(project_root)
+
 import asyncio
 import pandas as pd
 import mlflow
@@ -91,8 +97,8 @@ class PredictionResponse(BaseModel):
 model_state = {
     "model": None,
     "current_version": None,
-    "model_name": os.getenv("REGISTERED_MODEL_NAME"),
-    "model_alias": os.getenv("CHAMPION_ALIAS")
+    "model_name": os.getenv("REGISTERED_MODEL_NAME", "lending_club_loan_classification_model"),
+    "model_alias": os.getenv("CHAMPION_ALIAS", "champion"),
 }
 
 def load_champion_model():

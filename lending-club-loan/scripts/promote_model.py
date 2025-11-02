@@ -1,10 +1,12 @@
-# promote_model.py
 import os
 import argparse
 from mlflow.tracking import MlflowClient
 from dotenv import load_dotenv
 
-import config
+# Add project root to path to allow absolute imports
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src import config
 
 def promote_candidate_to_champion(model_name: str, candidate_alias: str, champion_alias: str):
     """
