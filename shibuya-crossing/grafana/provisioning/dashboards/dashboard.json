@@ -1,0 +1,204 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Jobs Processed (Total)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(worker_jobs_processed_total)",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Jobs Failed (Total)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(worker_jobs_failed_total)",
+          "legendFormat": ""
+        }
+      ],
+      "thresholds": [ { "color": "red", "value": 0.5 } ]
+    },
+    {
+      "id": 3,
+      "title": "Active Workers",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(up{job=\"workers\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "GPU Utilization (%)",
+      "type": "gauge",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(nv_gpu_utilization{job=\"triton\"})",
+          "legendFormat": "{{gpu_uuid}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Worker Throughput (Frames per Second)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(worker_processing_fps) by (instance)",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "fps",
+          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Triton Inference Throughput (req/sec)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(nv_inference_request_success{job=\"triton\"}[1m])) by (model_name)",
+          "legendFormat": "{{model_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        }
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "hide": 0,
+        "name": "prometheus",
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "VisionFlow System Overview",
+  "uid": "visionflow-overview-dashboard",
+  "version": 1,
+  "weekStart": ""
+}
