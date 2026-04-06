@@ -1,5 +1,0 @@
-fastapi
-uvicorn
-pika
-boto3
-python-multipart
